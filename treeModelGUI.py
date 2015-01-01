@@ -46,7 +46,9 @@ class TreeItem(object):
     def columnCount(self):
         return len(self.itemData)
 
-    def data(self, column):
+    def displayData(self, column):
+        """This function returns the data that should be displayed in the columns"""
+        
         try:
             return self.itemData[column]
         except IndexError:
@@ -79,12 +81,12 @@ class TreeModel(QtCore.QAbstractItemModel):
         if not index.isValid():
             return None
 
-        if role != QtCore.Qt.DisplayRole:
+        if role == QtCore.Qt.DisplayRole:
+            item = index.internalPointer()
+            return item.displayData(index.column())
+        else:
             return None
-
-        item = index.internalPointer()
-
-        return item.data(index.column())
+        
 
     def flags(self, index):
         if not index.isValid():
@@ -94,7 +96,7 @@ class TreeModel(QtCore.QAbstractItemModel):
 
     def headerData(self, section, orientation, role):
         if orientation == QtCore.Qt.Horizontal and role == QtCore.Qt.DisplayRole:
-            return self.rootItem.data(section)
+            return self.rootItem.displayData(section)
 
         return None
 
