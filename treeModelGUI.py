@@ -48,7 +48,6 @@ class TreeItem(object):
 
     def displayData(self, column):
         """This function returns the data that should be displayed in the columns"""
-        
         try:
             return self.itemData[column]
         except IndexError:
@@ -62,7 +61,15 @@ class TreeItem(object):
             return self.parentItem.childItems.index(self)
 
         return 0
-
+    
+    
+class SpecialTreeItem(TreeItem):
+    
+    def __init__(self,displayData,parent=None):
+        self.parentItem = parent
+        self.itemData = displayData
+        self.childItems = []
+        
 
 class TreeModel(QtCore.QAbstractItemModel):
     def __init__(self, data, parent=None):
@@ -175,6 +182,40 @@ class TreeModel(QtCore.QAbstractItemModel):
 
             number += 1
 
+class SpecialTreeModel(TreeModel):
+    
+    def __init__(self,data,parent=None):
+        
+        super(TreeModel, self).__init__(parent)
+        
+        self.rootItem = TreeItem(("Title", "Summary"))
+        self.setupModelData(self.rootItem)
+        
+    def setupModelData(self,parent):
+        
+        self.buildTree(parent=parent, level=0, maxLevel=5, maxSiblings=5)
+        
+    def buildTree(self,parent,level=0,maxLevel=5,maxSiblings=5):
+        
+        newDisplayData = ('hej','nej')
+        
+        if level < (maxLevel-1):
+            for siblingCounter in range(maxSiblings):
+            
+                newItem = SpecialTreeItem(displayData=newDisplayData,parent=parent)        
+                parent.appendChild(newItem)
+                
+                #Add some children, grand children etc to the newItem:
+                self.buildTree(parent=newItem, level = level + 1, maxLevel=maxLevel, maxSiblings=maxSiblings)
+
+        else:
+            #Leaf level reached:
+            newItem = SpecialTreeItem(displayData=newDisplayData,parent=parent)        
+            parent.appendChild(newItem)
+
+                 
+                 
+                
 
 if __name__ == '__main__':
 
@@ -184,7 +225,7 @@ if __name__ == '__main__':
 
     f = QtCore.QFile('default.txt')
     f.open(QtCore.QIODevice.ReadOnly)
-    model = TreeModel(f.readAll())
+    model = SpecialTreeModel(data=None)
     f.close()
 
     view = QtGui.QTreeView()
@@ -192,3 +233,4 @@ if __name__ == '__main__':
     view.setWindowTitle("Simple Tree Model")
     view.show()
     sys.exit(app.exec_())
+    
