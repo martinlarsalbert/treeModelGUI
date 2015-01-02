@@ -29,9 +29,10 @@ from PyQt4 import QtCore, QtGui
 
 
 class TreeItem(object):
-    def __init__(self, data, parent=None):
+    
+    def __init__(self,displayData,parent=None):
         self.parentItem = parent
-        self.itemData = data
+        self.displayData = displayData
         self.childItems = []
 
     def appendChild(self, item):
@@ -44,12 +45,12 @@ class TreeItem(object):
         return len(self.childItems)
 
     def columnCount(self):
-        return len(self.itemData)
+        return len(self.displayData)
 
     def displayData(self, column):
         """This function returns the data that should be displayed in the columns"""
         try:
-            return self.itemData[column]
+            return self.displayData[column]
         except IndexError:
             return None
 
@@ -61,22 +62,16 @@ class TreeItem(object):
             return self.parentItem.childItems.index(self)
 
         return 0
-    
-    
-class SpecialTreeItem(TreeItem):
-    
-    def __init__(self,displayData,parent=None):
-        self.parentItem = parent
-        self.itemData = displayData
-        self.childItems = []
         
 
 class TreeModel(QtCore.QAbstractItemModel):
-    def __init__(self, data, parent=None):
+    
+    def __init__(self,data,parent=None):
+        
         super(TreeModel, self).__init__(parent)
-
-        self.rootItem = TreeItem(("Title", "Summary"))
-        self.setupModelData(data.split('\n'), self.rootItem)
+        
+        self.rootItem = TreeItem(("Title",))
+        self.setupModelData(self.rootItem)
 
     def columnCount(self, parent):
         if parent.isValid():
@@ -90,7 +85,7 @@ class TreeModel(QtCore.QAbstractItemModel):
 
         if role == QtCore.Qt.DisplayRole:
             item = index.internalPointer()
-            return item.displayData(index.column())
+            return item.displayData[index.column()]
         else:
             return None
         
@@ -103,7 +98,7 @@ class TreeModel(QtCore.QAbstractItemModel):
 
     def headerData(self, section, orientation, role):
         if orientation == QtCore.Qt.Horizontal and role == QtCore.Qt.DisplayRole:
-            return self.rootItem.displayData(section)
+            return self.rootItem.displayData[section]
 
         return None
 
@@ -145,74 +140,35 @@ class TreeModel(QtCore.QAbstractItemModel):
 
         return parentItem.childCount()
 
-    def setupModelData(self, lines, parent):
-        parents = [parent]
-        indentations = [0]
-
-        number = 0
-
-        while number < len(lines):
-            position = 0
-            while position < len(lines[number]):
-                if lines[number][position] != ' ':
-                    break
-                position += 1
-
-            lineData = lines[number][position:].trimmed()
-
-            if lineData:
-                # Read the column data from the rest of the line.
-                columnData = [s for s in lineData.split('\t') if s]
-
-                if position > indentations[-1]:
-                    # The last child of the current parent is now the new
-                    # parent unless the current parent has no children.
-
-                    if parents[-1].childCount() > 0:
-                        parents.append(parents[-1].child(parents[-1].childCount() - 1))
-                        indentations.append(position)
-
-                else:
-                    while position < indentations[-1] and len(parents) > 0:
-                        parents.pop()
-                        indentations.pop()
-
-                # Append a new item to the current parent's list of children.
-                parents[-1].appendChild(TreeItem(columnData, parents[-1]))
-
-            number += 1
-
-class SpecialTreeModel(TreeModel):
-    
-    def __init__(self,data,parent=None):
-        
-        super(TreeModel, self).__init__(parent)
-        
-        self.rootItem = TreeItem(("Title", "Summary"))
-        self.setupModelData(self.rootItem)
         
     def setupModelData(self,parent):
         
         self.buildTree(parent=parent, level=0, maxLevel=5, maxSiblings=5)
         
-    def buildTree(self,parent,level=0,maxLevel=5,maxSiblings=5):
+    def buildTree(self,parent,level=0,maxLevel=5,maxSiblings=5,nameString=""):
         
-        newDisplayData = ('hej','nej')
         
         if level < (maxLevel-1):
             for siblingCounter in range(maxSiblings):
-            
-                newItem = SpecialTreeItem(displayData=newDisplayData,parent=parent)        
+                
+                newNameString = nameString + str(siblingCounter)
+
+                newDisplayData = (newNameString,)    
+                
+                newItem = TreeItem(displayData=newDisplayData,parent=parent)        
                 parent.appendChild(newItem)
                 
                 #Add some children, grand children etc to the newItem:
-                self.buildTree(parent=newItem, level = level + 1, maxLevel=maxLevel, maxSiblings=maxSiblings)
+                self.buildTree(parent=newItem, level = level + 1, maxLevel=maxLevel, maxSiblings=maxSiblings,nameString=newNameString)
 
         else:
             #Leaf level reached:
-            newItem = SpecialTreeItem(displayData=newDisplayData,parent=parent)        
+            newNameString = nameString + 'Leaf'
+            newDisplayData = (newNameString,)    
+            
+            newItem = TreeItem(displayData=newDisplayData,parent=parent)        
             parent.appendChild(newItem)
-
+        
                  
                  
                 
@@ -225,7 +181,7 @@ if __name__ == '__main__':
 
     f = QtCore.QFile('default.txt')
     f.open(QtCore.QIODevice.ReadOnly)
-    model = SpecialTreeModel(data=None)
+    model = TreeModel(data=None)
     f.close()
 
     view = QtGui.QTreeView()
