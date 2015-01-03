@@ -6,26 +6,26 @@ from copy import deepcopy
 class TreeItem(object):
     
     def __init__(self,displayData,parent=None):
-        self.parentItem = parent
+        self.parent = parent
         self.displayData = displayData
-        self.childItems = []
+        self.children = []
 
     def appendChild(self, item):
-        self.childItems.append(item)
+        self.children.append(item)
         
     def removeChild(self, row): 
-        value = self.childItems[row] 
-        self.childItems.remove(value)
+        value = self.children[row] 
+        self.children.remove(value)
         
     def removeChildAtRow( self, row ):
         '''Removes an item at the given index from the list of children.'''
-        self.childItems.pop( row ) 
+        self.children.pop( row ) 
 
     def child(self, row):
-        return self.childItems[row]
+        return self.children[row]
 
     def childCount(self):
-        return len(self.childItems)
+        return len(self.children)
 
     def columnCount(self):
         return len(self.displayData)
@@ -38,12 +38,12 @@ class TreeItem(object):
             return None
 
     def parent(self):
-        return self.parentItem
+        return self.parent
 
     def row( self ):
         '''Get this item's index in its parent item's child list.'''
         if self.parent:
-            return self.parentItem.childItems.index( self )
+            return self.parent.children.index( self )
         return 0
         
 
@@ -53,14 +53,14 @@ class TreeModel(QtCore.QAbstractItemModel):
         
         super(TreeModel, self).__init__(parent)
         
-        self.rootItem = TreeItem(("Title",))
-        self.setupModelData(self.rootItem)
+        self.root = TreeItem(("Title",))
+        self.setupModelData(self.root)
 
     def columnCount(self, parent):
         if parent.isValid():
             return parent.internalPointer().columnCount()
         else:
-            return self.rootItem.columnCount()
+            return self.root.columnCount()
 
     def data(self, index, role):
         if not index.isValid():
@@ -85,7 +85,7 @@ class TreeModel(QtCore.QAbstractItemModel):
     
     def headerData(self, section, orientation, role):
         if orientation == QtCore.Qt.Horizontal and role == QtCore.Qt.DisplayRole:
-            return self.rootItem.displayData[section]
+            return self.root.displayData[section]
 
         return None
 
@@ -94,12 +94,12 @@ class TreeModel(QtCore.QAbstractItemModel):
             return QtCore.QModelIndex()
 
         if not parent.isValid():
-            parentItem = self.rootItem
+            parent = self.root
         else:
-            parentItem = parent.internalPointer()
+            parent = parent.internalPointer()
             
         
-        childItem = parentItem.child(row)
+        childItem = parent.child(row)
         if childItem:
             return self.createIndex(row, column, childItem)
         else:
@@ -108,8 +108,8 @@ class TreeModel(QtCore.QAbstractItemModel):
     def parent( self, index ):
         '''Returns a QMoelIndex for the parent of the item at the given index.'''
         item = self.itemFromIndex( index )
-        parent = item.parentItem
-        if parent == self.rootItem:
+        parent = item.parent
+        if parent == self.root:
             return QtCore.QModelIndex()
         return self.createIndex( parent.row(), 0, parent )
 
@@ -118,11 +118,11 @@ class TreeModel(QtCore.QAbstractItemModel):
             return 0
 
         if not parent.isValid():
-            parentItem = self.rootItem
+            parent = self.root
         else:
-            parentItem = parent.internalPointer()
+            parent = parent.internalPointer()
 
-        return parentItem.childCount()
+        return parent.childCount()
     
     def supportedDropActions( self ):
         '''Items can be moved and copied (but we only provide an interface for moving items in this example.'''
@@ -168,7 +168,7 @@ class TreeModel(QtCore.QAbstractItemModel):
         dropParent = self.itemFromIndex( parentIndex )
         
         #The parent has to be changed to dropParent:
-        item.parentItem = dropParent
+        item.parent = dropParent
         
         dropParent.appendChild( item )
         
