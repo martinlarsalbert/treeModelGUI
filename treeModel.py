@@ -1,6 +1,7 @@
 
 from PyQt4 import QtCore, QtGui
-
+import cPickle
+from copy import deepcopy
 
 class TreeItem(object):
     
@@ -11,6 +12,14 @@ class TreeItem(object):
 
     def appendChild(self, item):
         self.childItems.append(item)
+        
+    def removeChild(self, row): 
+        value = self.childItems[row] 
+        self.childItems.remove(value)
+        
+    def removeChildAtRow( self, row ):
+        '''Removes an item at the given index from the list of children.'''
+        self.childItems.pop( row ) 
 
     def child(self, row):
         return self.childItems[row]
@@ -31,10 +40,10 @@ class TreeItem(object):
     def parent(self):
         return self.parentItem
 
-    def row(self):
-        if self.parentItem:
-            return self.parentItem.childItems.index(self)
-
+    def row( self ):
+        '''Get this item's index in its parent item's child list.'''
+        if self.parent:
+            return self.parentItem.childItems.index( self )
         return 0
         
 
@@ -64,12 +73,16 @@ class TreeModel(QtCore.QAbstractItemModel):
             return None
         
 
-    def flags(self, index):
+    def flags( self, index ):
+        '''Valid items are selectable, editable, and drag and drop enabled. Invalid indices (open space in the view)
+        are also drop enabled, so you can drop items onto the top level.
+        '''
         if not index.isValid():
-            return QtCore.Qt.NoItemFlags
-
-        return QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable
-
+            return QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsDropEnabled
+         
+        return QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsDropEnabled | QtCore.Qt.ItemIsDragEnabled |\
+               QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEditable
+    
     def headerData(self, section, orientation, role):
         if orientation == QtCore.Qt.Horizontal and role == QtCore.Qt.DisplayRole:
             return self.rootItem.displayData[section]
@@ -91,19 +104,14 @@ class TreeModel(QtCore.QAbstractItemModel):
             return self.createIndex(row, column, childItem)
         else:
             return QtCore.QModelIndex()
-
-
-    def parent(self, index):
-        if not index.isValid():
+    
+    def parent( self, index ):
+        '''Returns a QMoelIndex for the parent of the item at the given index.'''
+        item = self.itemFromIndex( index )
+        parent = item.parentItem
+        if parent == self.rootItem:
             return QtCore.QModelIndex()
-
-        childItem = index.internalPointer()
-        parentItem = childItem.parent()
-
-        if parentItem == self.rootItem:
-            return QtCore.QModelIndex()
-
-        return self.createIndex(parentItem.row(), 0, parentItem)
+        return self.createIndex( parent.row(), 0, parent )
 
     def rowCount(self, parent):
         if parent.column() > 0:
@@ -115,6 +123,82 @@ class TreeModel(QtCore.QAbstractItemModel):
             parentItem = parent.internalPointer()
 
         return parentItem.childCount()
+    
+    def supportedDropActions( self ):
+        '''Items can be moved and copied (but we only provide an interface for moving items in this example.'''
+        return QtCore.Qt.MoveAction | QtCore.Qt.CopyAction
+   
+    def flags( self, index ):
+        '''Valid items are selectable, editable, and drag and drop enabled. Invalid indices (open space in the view)
+        are also drop enabled, so you can drop items onto the top level.
+        '''
+        if not index.isValid():
+            return QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsDropEnabled
+         
+        return QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsDropEnabled | QtCore.Qt.ItemIsDragEnabled |\
+               QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEditable
+
+    def mimeTypes( self ):
+        '''The MimeType for the encoded data.'''
+        types = QtCore.QStringList( 'application/x-pynode-item-instance' )
+        return types
+    
+    def mimeData( self, indices ):
+        '''Encode serialized data from the item at the given index into a QMimeData object.'''
+        data = ''
+        item = self.itemFromIndex( indices[0] )
+        try:
+            data += cPickle.dumps( item )
+        except:
+            pass
+        mimedata = QtCore.QMimeData()
+        mimedata.setData( 'application/x-pynode-item-instance', data )
+        return mimedata
+
+    def dropMimeData( self, mimedata, action, row, column, parentIndex ):
+        '''Handles the dropping of an item onto the model.
+         
+        De-serializes the data into a TreeItem instance and inserts it into the model.
+        '''
+        if not mimedata.hasFormat( 'application/x-pynode-item-instance' ):
+            return False
+        item = cPickle.loads( str( mimedata.data( 'application/x-pynode-item-instance' ) ) )
+    
+        
+        dropParent = self.itemFromIndex( parentIndex )
+        
+        #The parent has to be changed to dropParent:
+        item.parentItem = dropParent
+        
+        dropParent.appendChild( item )
+        
+        self.insertRows( dropParent.childCount()-1, 1, parentIndex )
+        self.dataChanged.emit( parentIndex, parentIndex )
+        return True
+    
+    def insertRow(self, row, parent): 
+        return self.insertRows(row, 1, parent) 
+    
+    def insertRows( self, row, count, parentIndex ):
+        '''Add a number of rows to the model at the given row and parent.'''
+        self.beginInsertRows( parentIndex, row, row+count-1 )
+        self.endInsertRows()
+        return True
+
+    def removeRow(self, row, parentIndex): 
+        return self.removeRows(row, 1, parentIndex) 
+    
+    def removeRows( self, row, count, parentIndex ):
+        '''Remove a number of rows from the model at the given row and parent.'''
+        self.beginRemoveRows( parentIndex, row, row+count-1 )
+        parent = self.itemFromIndex( parentIndex )
+        for x in range( count ):
+            parent.removeChildAtRow( row )
+        self.endRemoveRows()
+        return True
+ 
+    def itemFromIndex(self, index): 
+        return index.internalPointer() if index.isValid() else self.root 
 
         
     def setupModelData(self,parent):
@@ -144,22 +228,5 @@ class TreeModel(QtCore.QAbstractItemModel):
             
             newItem = TreeItem(displayData=newDisplayData,parent=parent)        
             parent.appendChild(newItem)
-                   
 
-if __name__ == '__main__':
-
-    import sys
-
-    app = QtGui.QApplication(sys.argv)
-
-    f = QtCore.QFile('default.txt')
-    f.open(QtCore.QIODevice.ReadOnly)
-    model = TreeModel()
-    f.close()
-
-    view = QtGui.QTreeView()
-    view.setModel(model)
-    view.setWindowTitle("Simple Tree Model")
-    view.show()
-    sys.exit(app.exec_())
     
