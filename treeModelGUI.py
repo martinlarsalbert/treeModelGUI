@@ -3,6 +3,7 @@ from PyQt4 import QtGui
 from PyQt4 import QtCore
 
 import treeModel
+from copy import deepcopy
 
 # ---------------------------------------------------------------------
 class MainWindow(QtGui.QMainWindow):
@@ -44,6 +45,10 @@ class MyTreeView(QtGui.QTreeView):
         self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self.openMenu)
         
+        #Node that has been cut:
+        self.cutIndex = None
+        self.copyIndex = None
+        
     def change(self, topLeftIndex, bottomRightIndex): 
         self.update(topLeftIndex)
         #self.expandAll() 
@@ -72,6 +77,12 @@ class MyTreeView(QtGui.QTreeView):
         self.popup_menu.addAction("New", self.new)
         self.popup_menu.addAction("Rename", self.new)
         self.popup_menu.addSeparator()
+        
+        self.popup_menu.addAction("Copy", self.copy)
+        self.popup_menu.addAction("Cut", self.cut)
+        self.popup_menu.addAction("Paste", self.paste)
+        self.popup_menu.addSeparator()
+        
         self.popup_menu.addAction("Delete", self.deleteItem)
         
         self.popup_menu.exec_(self.viewport().mapToGlobal(position))
@@ -83,7 +94,55 @@ class MyTreeView(QtGui.QTreeView):
         currentItem = currentIndex.internalPointer()
         
         print currentItem.displayData[0]
+    
+    def cut(self):
+        """Cut a node"""
+        self.cutIndex = self.currentIndex()
+        self.copyIndex = None
+        
+    def copy(self):
+        """Copy a node"""
+        self.cutIndex = None
+        self.copyIndex = self.currentIndex()
+        
+    def paste(self):
+        """Paste a node
+        A node is pasted before the selected destination node
+        """
+        
+        sourceIndex = None
+        if self.cutIndex != None:
+            sourceIndex = self.cutIndex
+        elif self.copyIndex != None:
+            sourceIndex = self.copyIndex
+            
+        if sourceIndex != None:
+        
+            destinationIndex = self.currentIndex()
+            destinationItem = destinationIndex.internalPointer()
+            destinationParent = destinationItem.parent
+            destinationParentIndex = self.myModel.parent(index=destinationIndex)
+            
+            
+            sourceItem = sourceIndex.internalPointer()
+            sourceRow = sourceItem.row()
+            
+            sourceParentIndex = self.myModel.parent(index=sourceIndex)
+            
+            row = destinationItem.row()
+            
+            if self.cutIndex != None:              
+                self.myModel.moveItem(sourceParentIndex=sourceParentIndex,
+                                      sourceRow=sourceRow,
+                                      destinationParentIndex=destinationParentIndex,
+                                      destinationRow = row)
+            else:
+                self.myModel.copyItem(sourceParentIndex=sourceParentIndex,
+                                      sourceRow=sourceRow,
+                                      destinationParentIndex=destinationParentIndex,
+                                      destinationRow = row)
 
+    
     def deleteItem(self):
         """Deletes the current item (node)"""
         

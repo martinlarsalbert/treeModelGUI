@@ -13,6 +13,10 @@ class TreeItem(object):
     def appendChild(self, item):
         self.children.append(item)
         
+    def insertChild(self,item,row):
+        item.parent = self
+        self.children.insert(row,item)
+        
     def removeChild(self, row): 
         value = self.children[row] 
         self.children.remove(value)
@@ -176,10 +180,48 @@ class TreeModel(QtCore.QAbstractItemModel):
         self.dataChanged.emit( parentIndex, parentIndex )
         return True
     
+    def moveItem(self,sourceParentIndex,sourceRow,destinationParentIndex,destinationRow):
+        """Move an item from sourceParentIndex, sourceRow to 
+        destinationParentIndex, destinationRow"""
+        
+        sourceItemIndex = self.index(row=sourceRow, column=0, parent=sourceParentIndex)
+        sourceItem = deepcopy(self.itemFromIndex(index=sourceItemIndex))
+                
+        #Insert source in destination:
+        destinationParent = self.itemFromIndex(destinationParentIndex)
+        sourceItem.parent = destinationParent
+        destinationParent.insertChild(item=sourceItem,row=destinationRow)
+        
+        #Remove source:
+        sourceParent = self.itemFromIndex(sourceParentIndex)
+        sourceParent.removeChildAtRow(row=sourceRow+1)
+        
+        self.beginMoveRows(sourceParentIndex, sourceRow, sourceRow, destinationParentIndex, destinationRow)
+        self.endMoveRows()
+        
+        self.dataChanged.emit( destinationParentIndex, destinationParentIndex )
+    
+    def copyItem(self,sourceParentIndex,sourceRow,destinationParentIndex,destinationRow):
+        """Copy an item from sourceParentIndex, sourceRow to 
+        destinationParentIndex, destinationRow"""
+        
+        sourceItemIndex = self.index(row=sourceRow, column=0, parent=sourceParentIndex)
+        sourceItem = deepcopy(self.itemFromIndex(index=sourceItemIndex))
+                
+        #Insert source in destination:
+        destinationParent = self.itemFromIndex(destinationParentIndex)
+        sourceItem.parent = destinationParent
+        destinationParent.insertChild(item=sourceItem,row=destinationRow)
+                
+        self.beginMoveRows(sourceParentIndex, sourceRow, sourceRow, destinationParentIndex, destinationRow)
+        self.endMoveRows()
+        
+        self.dataChanged.emit( destinationParentIndex, destinationParentIndex )
+        
     def insertRow(self, row, parent): 
         return self.insertRows(row, 1, parent) 
     
-    def insertRows( self, row, count, parentIndex ):
+    def insertRows( self, row, count, parentIndex):
         '''Add a number of rows to the model at the given row and parent.'''
         self.beginInsertRows( parentIndex, row, row+count-1 )
         self.endInsertRows()
